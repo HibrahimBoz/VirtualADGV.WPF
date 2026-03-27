@@ -7,7 +7,7 @@
     
     <!-- NuGet Metadata -->
     <PackageId>VirtualADGV.WPF</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Authors>HibrahimBoz</Authors>
     <Description>Advanced virtual DataGrid for WPF with filtering, sorting, search and theming support.</Description>
     <PackageTags>wpf;datagrid;filter;sort;search;darkmode</PackageTags>
