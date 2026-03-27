@@ -6,7 +6,10 @@
              xmlns:local="clr-namespace:VirtualADGV.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="350" d:DesignWidth="250"
-             x:Name="self">
+             x:Name="self"
+             Background="{DynamicResource PopupBackgroundBrush}"
+             Foreground="{DynamicResource PopupForegroundBrush}"
+             BorderBrush="{DynamicResource PopupBorderBrush}" BorderThickness="1">
 
     <UserControl.Resources>
         <local:BoolToBrushConverter x:Key="BoolToBrushConverter" 

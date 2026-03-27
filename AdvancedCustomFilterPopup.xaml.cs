@@ -369,13 +369,7 @@ namespace VirtualADGV.WPF
                                 yParent.Children.Add(mParent);
                             }
 
-                            var dNode = new FilterItemModel { Value = val, Parent = mParent, IsExpanded = false }; // Sadece leaf node'ların Value'su asıl filtre değeridir
-                            dNode.Value = val; // Actually store the real exact string as Value to be used in SQL
-                            // Modify display text for leaf to just be day
-                            dNode.GetType().GetProperty("DisplayText")?.SetValue(dNode, dStr); 
-                            // Wait, DisplayText is read-only. We'll add custom Title via an override later, but for now we'll just keep the default or use a Wrapper.
-                            // Actually, let's just use Value for real SQL value, and add a separate Title property to FilterItemModel
-                            
+                            var dNode = new FilterItemModel { Value = val, Parent = mParent, IsExpanded = false, DisplayTextOverride = dStr };
                             mParent.Children.Add(dNode);
                             dNode.IsChecked = isSel ? true : false;
                         }
