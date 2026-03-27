@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    
+    <!-- NuGet Metadata -->
+    <PackageId>VirtualADGV.WPF</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Halil</Authors>
+    <Description>Advanced virtual DataGrid for WPF with filtering, sorting, search and theming support.</Description>
+    <PackageTags>wpf;datagrid;filter;sort;search;darkmode</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/hllknc/VirtualADGV.WPF</RepositoryUrl>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

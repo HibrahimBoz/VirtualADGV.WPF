@@ -1,0 +1,33 @@
+VirtualADGV.WPF - Sürüm Notları (Release Notes)
+===========================================
+
+Sürüm: 1.0.0 (NuGet Hazırlık Finalizasyonu)
+Tarih: 27 Mart 2024
+
+Bu sürüm, kütüphanenin NuGet üzerinden dağıtılabilir hale getirilmesi için yapılan kapsamlı modernizasyon ve bağımsızlaştırma çalışmalarını içerir.
+
+YENİLİKLER VE İYİLEŞTİRMELER:
+----------------------------
+
+1. LOKALİZASYON (Localization) DESTEĞİ:
+   * 'VirtualDataGridStrings' sınıfı eklendi. Tüm UI metinleri (arama kutusu, filtre popupları, butonlar vb.) bu sınıf üzerinden yönetilebilir hale getirildi.
+   * Kullanıcılar çalışma zamanında (Runtime) 'Strings' property'sini değiştirerek dili kolayca özelleştirebilirler.
+   * Hardcode edilmiş tüm Türkçe metinler temizlendi ve varsayılan olarak İngilizce'ye çevrildi.
+
+2. NUGET PAKETLEME (Packaging):
+   * .csproj dosyasına NuGet metadataları (Authors, Description, RepositoryUrl, License vb.) eklendi.
+   * 'LICENSE' (MIT) ve 'README.md' dosyaları pakete dahil edildi.
+   * Paketleme sırasında otomatik XML dokümantasyon üretimi aktif edildi.
+
+3. KÜTÜPHANE BAĞIMSIZLIĞI (Decoupling):
+   * 'BoolToBrushConverter' sınıfı, ana uygulamadaki kaynak bağımlılığından ('Application.Current.FindResource') kurtarıldı.
+   * 'MatchedBrush' ve 'UnmatchedBrush' property'leri eklenerek fırçaların XAML üzerinden enjekte edilmesi sağlandı.
+
+4. KOD KALİTESİ VE DOKÜMANTASYON:
+   * Tüm halka açık (public) sınıflar, metodlar ve özellikler için XML Summary dokümantasyonu eklendi.
+   * C# 8.0 Nullable Reference Types (NRT) uyarıları giderildi ve kod tipi güvenliği artırıldı.
+   * 'FilterItemModel' hiyerarşik yapı (Select All > Yıl > Ay > Gün) için optimize edildi.
+
+5. HATA DÜZELTMELERİ:
+   * Sütun seçme (double click) özelliği hiyerarşik kolon yapılarında stabilize edildi.
+   * Arama çubuğu (Search Panel) görünürlük ve odaklanma sorunları giderildi.

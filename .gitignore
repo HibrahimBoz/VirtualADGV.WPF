@@ -1,0 +1,13 @@
+# dotnet
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio
+.vs/
+
+# Packages
+nupkg/
+*.nupkg

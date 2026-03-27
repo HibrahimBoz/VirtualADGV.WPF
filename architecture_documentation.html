@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>VirtualADGV.WPF Mimari Dokümantasyonu</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; }
+        header { border-bottom: 2px solid #0078d4; padding-bottom: 10px; margin-bottom: 20px; }
+        h1 { color: #0078d4; }
+        h2 { color: #2b5797; border-left: 5px solid #2b5797; padding-left: 10px; margin-top: 30px; }
+        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        code { background: #e8e8e8; padding: 2px 5px; border-radius: 4px; font-family: Consolas, monospace; }
+        .tag { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; text-transform: uppercase; margin-right: 5px; }
+        .tag-wpf { background: #512bd4; color: white; }
+        .tag-mvvm { background: #0078d4; color: white; }
+        .tag-ui { background: #e0e0e0; color: #333; }
+        ul { list-style-type: square; }
+        .warning { background-color: #fff3cd; border-left: 5px solid #ffecb5; padding: 15px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>VirtualADGV.WPF Mimari Analizi</h1>
+        <p>Gelişmiş Veri Izgarası (DataGrid) ve Filtreleme Bileşen Kütüphanesi</p>
+    </header>
+
+    <div class="card">
+        <h2>Genel Bakış</h2>
+        <p><code>VirtualADGV.WPF</code>, standart WPF <code>DataGrid</code> bileşenini genişleterek Excel benzeri gelişmiş filtreleme, sıralama ve arama yetenekleri ekleyen, <strong>bağımsız (Self-contained) bir NuGet paketi</strong> olarak tasarlanmış Shared Kontrol Kütüphanesi'dir.</p>
+        <div>
+            <span class="tag tag-wpf">WPF</span>
+            <span class="tag tag-ui">NuGet Ready</span>
+            <span class="tag tag-mvvm">Localized</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Yeni Özellikler (v1.0.0)</h2>
+        <ul>
+            <li><strong>Lokalizasyon Sistemi:</strong> <code>VirtualDataGridStrings</code> üzerinden tüm UI metinlerine tam erişim ve dinamik dil değiştirme desteği.</li>
+            <li><strong>Bağımsızlık:</strong> Harici tema kaynaklarına bağımlılıklar (Converter'lar vb.) temizlenerek kütüphanenin herhangi bir WPF projesine kolayca entegre edilmesi sağlandı.</li>
+            <li><strong>Dokümantasyon:</strong> Tüm API'ler için XML Summary desteği ve IntelliSense uyumluluğu.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>Bileşen Yapısı</h2>
+        <ul>
+            <li><strong>VirtualDataGrid.cs:</strong> Ana kontrol sınıfı. Arama çubuğu, filtre popup'ı ve sıralama mantığını yönetir.</li>
+            <li><strong>VirtualDataGridStrings.cs:</strong> Tüm UI etiketlerini barındıran merkezi lokalizasyon sınıfı.</li>
+            <li><strong>AdvancedCustomFilterPopup.xaml:</strong> Hiyerarşik filtreleme (Tarih ağacı vb.) ve sıralama arayüzü.</li>
+            <li><strong>VirtualCustomFilterWindow.xaml:</strong> Çoklu koşullu (AND/OR) özel filtreleme diyaloğu.</li>
+            <li><strong>BoolToBrushConverter.cs:</strong> Arama sonuçlarını renklendiren, bağımsız fırça enjeksiyonu destekleyen dönüştürücü.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>Mimari Detaylar</h2>
+        <p>Kontrol kütüphanesi, <strong>"Plug-and-Play"</strong> prensibiyle çalışır:</p>
+        <ul>
+            <li><strong>Dependency Injection:</strong> Fırçalar ve metin kaynakları XAML üzerinden <code>DynamicResource</code> veya <code>Binding</code> ile sağlanabilir.</li>
+            <li><strong>Virtualized Logic:</strong> Milyonlarca satır veriyle çalışırken UI donmasını önlemek için async filtre yükleme (<code>LoadingFilterValuesAsync</code>) desteği sunar.</li>
+            <li><strong>Template-Driven UI:</strong> <code>Themes/Generic.xaml</code> üzerinden tamamen özelleştirilebilir bir görünüm sunar.</li>
+        </ul>
+    </div>
+
+    <footer style="margin-top: 50px; font-size: 0.8em; color: #666;">
+        Doküman Antigravity tarafından otomatik olarak oluşturulmuştur.
+    </footer>
+</body>
+</html>
