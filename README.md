@@ -13,6 +13,7 @@ An advanced, high-performance WPF DataGrid control with Excel-like filtering, mu
 - **Checkbox list** for text/numeric columns — select individual values
 - **Hierarchical tree view** for date columns — group by Year → Month → Day
 - **Custom filter dialog** — build compound conditions (e.g., `> 100 AND < 500`)
+- **Cascading filter (Excel-style)** — values that no longer exist under the other columns' active filters are shown **disabled** (grayed and unselectable) via `LoadingFilterEventArgs.EnabledValues`, so out-of-view values never come pre-checked
 - **Operator support:**
   - Text: equals, does not equal, begins with, ends with, contains, does not contain
   - Number: equals, does not equal, greater than, greater/less than or equal, between
@@ -74,7 +75,7 @@ An advanced, high-performance WPF DataGrid control with Excel-like filtering, mu
 2. Install the package:
 
 ```bash
-dotnet add package VirtualADGV.WPF --version 1.0.0
+dotnet add package VirtualADGV.WPF --version 1.0.3
 ```
 
 ---
@@ -108,7 +109,12 @@ MyGrid.LoadingFilterValuesAsync = async (sender, args) =>
 {
     // Return distinct values for the column from your data source
     args.DistinctValues = await GetDistinctValuesAsync(args.ColumnName);
+    // Values currently selected by this column's own filter (shown checked)
     args.ActiveFilters  = GetActiveFilters(args.ColumnName);
+    // OPTIONAL — cascading filter: values that still exist under the OTHER
+    // columns' active filters. Anything not in this set is shown disabled
+    // (grayed, unselectable). Leave null to keep every value enabled.
+    args.EnabledValues  = await GetEnabledValuesAsync(args.ColumnName);
 };
 
 MyGrid.FilterChanged += (sender, args) =>
@@ -170,6 +176,16 @@ MyGrid.Strings.OpGreaterThan    = "büyük";
 | `SetColumnFilterEnabled(int, bool)` | method | Enable/disable filter per column |
 | `SetColumnSortEnabled(int, bool)` | method | Enable/disable sort per column |
 
+### `LoadingFilterEventArgs`
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `ColumnName` | `string` | The column whose filter popup is opening |
+| `ColumnType` | `Type` | Column data type (drives numeric/date behavior) |
+| `DistinctValues` | `IEnumerable<string>` | Full distinct value list to display |
+| `ActiveFilters` | `IEnumerable<string>` | Values currently selected (shown checked) |
+| `EnabledValues` | `ISet<string>?` | Values still present under other columns' filters; values outside this set are shown disabled. `null` = all enabled |
+
 ### Attached Properties
 
 | Property | Target | Description |
@@ -213,6 +229,7 @@ Büyük veri setleri (1M+ satır) için tasarlanmış, Excel benzeri filtreleme,
 - Metin/sayı sütunları için **checkbox listesi** — değerleri tek tek seç
 - Tarih sütunları için **hiyerarşik ağaç görünümü** — Yıl → Ay → Gün gruplandırması
 - **Özel filtre diyaloğu** — bileşik koşullar oluştur (örn. `> 100 VE < 500`)
+- **Kademeli filtre (Excel tarzı)** — diğer sütunların aktif filtreleri altında artık var olmayan değerler `LoadingFilterEventArgs.EnabledValues` ile **disabled** (gri ve seçilemez) gösterilir; böylece tabloda görünmeyen değerler asla işaretli gelmez
 - **Operatör desteği:**
   - Metin: eşittir, eşit değildir, başlar, biter, içerir, içermez
   - Sayı: eşittir, eşit değildir, büyüktür, büyük/küçük veya eşittir, arasında
@@ -274,7 +291,7 @@ Büyük veri setleri (1M+ satır) için tasarlanmış, Excel benzeri filtreleme,
 2. Paketi yükleyin:
 
 ```bash
-dotnet add package VirtualADGV.WPF --version 1.0.0
+dotnet add package VirtualADGV.WPF --version 1.0.3
 ```
 
 ---
@@ -307,7 +324,12 @@ xmlns:adgv="clr-namespace:VirtualADGV.WPF;assembly=VirtualADGV.WPF"
 MyGrid.LoadingFilterValuesAsync = async (sender, args) =>
 {
     args.DistinctValues = await GetDistinctValuesAsync(args.ColumnName);
+    // Bu sütunun kendi filtresinin seçtiği değerler (işaretli gelir)
     args.ActiveFilters  = GetActiveFilters(args.ColumnName);
+    // İSTEĞE BAĞLI — kademeli filtre: DİĞER sütunların filtreleri altında hâlâ
+    // var olan değerler. Bu kümede olmayanlar disabled (gri, seçilemez) gösterilir.
+    // null bırakılırsa tüm değerler etkin kalır.
+    args.EnabledValues  = await GetEnabledValuesAsync(args.ColumnName);
 };
 
 MyGrid.FilterChanged += (sender, args) =>

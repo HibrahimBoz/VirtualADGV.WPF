@@ -1,6 +1,31 @@
 VirtualADGV.WPF - Sürüm Notları (Release Notes)
 ===========================================
 
+Sürüm: 1.0.3 (Kademeli Filtre — Disabled Değerler)
+Tarih: 3 Haziran 2026
+
+Excel tarzı kademeli (cascading) filtre desteği eklendi.
+
+YENİLİKLER VE İYİLEŞTİRMELER:
+----------------------------
+
+1. KADEMELİ FİLTRE (Cascading Filter):
+   * 'LoadingFilterEventArgs.EnabledValues' (ISet<string>?) property'si eklendi.
+     Bu kümede olmayan distinct değerler filtre popup'ında DISABLED (gri, seçilemez)
+     gösterilir. null bırakılırsa tüm değerler etkin kalır (geriye dönük uyumlu).
+   * 'FilterItemModel.IsEnabled' property'si eklendi; checkbox ve tarih ağacı
+     şablonları bu değere bağlandı.
+   * Disabled değerler "Tümünü Seç" işleminden ve tristate hesabından hariç tutulur;
+     hiçbir zaman işaretli gelmezler.
+   * Uygula mantığı: etkin değerlerin tümü işaretliyse sütun filtresi temizlenir,
+     böylece disabled değerler yüzünden istemeden filtre eklenmez.
+
+2. HATA DÜZELTMELERİ:
+   * Aktif filtresi olan sütun yeniden açıldığında tüm değerlerin işaretsiz gelmesi
+     düzeltildi (ActiveFilters artık ham SQL yerine seçili değer listesini taşır).
+
+----------------------------------------------------------------------
+
 Sürüm: 1.0.0 (NuGet Hazırlık Finalizasyonu)
 Tarih: 27 Mart 2024
 

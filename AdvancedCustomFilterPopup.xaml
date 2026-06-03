@@ -166,13 +166,17 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <CheckBox x:Name="itemCheckBox" Content="{Binding DisplayText}" IsChecked="{Binding IsChecked, Mode=TwoWay}"
-                                  FontSize="11" Margin="0,1" Click="ChkItem_Changed">
+                                  IsEnabled="{Binding IsEnabled}" FontSize="11" Margin="0,1" Click="ChkItem_Changed">
                             <CheckBox.Style>
                                 <Style TargetType="CheckBox">
                                     <Setter Property="Foreground" Value="{DynamicResource PopupForegroundBrush}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsMatched}" Value="False">
                                             <Setter Property="Foreground" Value="{DynamicResource UnmatchedBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                            <Setter Property="Foreground" Value="{DynamicResource SubtleForegroundBrush}"/>
+                                            <Setter Property="Opacity" Value="0.45"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -203,7 +207,7 @@
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                         <CheckBox Content="{Binding DisplayText}" IsChecked="{Binding IsChecked, Mode=TwoWay}"
-                                  FontSize="11" Margin="0,1" Foreground="{DynamicResource PopupForegroundBrush}" Click="ChkItem_Changed" />
+                                  IsEnabled="{Binding IsEnabled}" FontSize="11" Margin="0,1" Foreground="{DynamicResource PopupForegroundBrush}" Click="ChkItem_Changed" />
                     </HierarchicalDataTemplate>
                 </TreeView.ItemTemplate>
                 <TreeView.ItemContainerStyle>

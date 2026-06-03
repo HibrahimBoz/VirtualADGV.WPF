@@ -73,6 +73,24 @@ namespace VirtualADGV.WPF
             }
         }
 
+        private bool _isEnabled = true;
+        /// <summary>
+        /// Whether this value still exists under the other columns' active filters.
+        /// Disabled (0-row) values are shown grayed and cannot be checked.
+        /// </summary>
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                if (_isEnabled != value)
+                {
+                    _isEnabled = value;
+                    if (!SuppressNotification) OnPropertyChanged(nameof(IsEnabled));
+                }
+            }
+        }
+
         private bool _isExpanded = false;
         /// <summary>Whether the tree node is expanded.</summary>
         public bool IsExpanded
@@ -190,13 +208,20 @@ namespace VirtualADGV.WPF
         private Type _columnType = typeof(string);
 
         /// <summary>
+        /// Values that still exist under the other columns' active filters. When non-null,
+        /// any distinct value NOT in this set is shown disabled (grayed, unselectable).
+        /// </summary>
+        private ISet<string>? _enabledValues;
+
+        /// <summary>
         /// Initializes the popup with column data and current state.
         /// </summary>
-        public void Initialize(string columnName, IEnumerable<string> distinctValues, IEnumerable<string> activeFilters, Type columnType, VirtualDataGridStrings strings)
+        public void Initialize(string columnName, IEnumerable<string> distinctValues, IEnumerable<string> activeFilters, Type columnType, VirtualDataGridStrings strings, ISet<string>? enabledValues = null)
         {
             Strings = strings;
             ColumnName = columnName;
             _columnType = columnType;
+            _enabledValues = enabledValues;
             _previousSelectedValues = activeFilters?.ToList() ?? new List<string>();
 
             BtnClearFilter.IsEnabled = _previousSelectedValues.Any();
@@ -339,11 +364,12 @@ namespace VirtualADGV.WPF
 
                     foreach (string val in sortedValues)
                     {
-                        bool isSel = allSelected || _previousSelectedValues.Contains(val);
+                        bool enabled = _enabledValues == null || _enabledValues.Contains(val);
+                        bool isSel = enabled && (allSelected || _previousSelectedValues.Contains(val));
 
                         if (string.IsNullOrEmpty(val))
                         {
-                            FilterItems.Add(new FilterItemModel { Value = "", IsSelected = isSel, DisplayTextOverride = Strings.EmptyValue });
+                            FilterItems.Add(new FilterItemModel { Value = "", IsSelected = isSel, IsEnabled = enabled, DisplayTextOverride = Strings.EmptyValue });
                             continue;
                         }
 
@@ -369,13 +395,13 @@ namespace VirtualADGV.WPF
                                 yParent.Children.Add(mParent);
                             }
 
-                            var dNode = new FilterItemModel { Value = val, Parent = mParent, IsExpanded = false, DisplayTextOverride = dStr };
+                            var dNode = new FilterItemModel { Value = val, Parent = mParent, IsExpanded = false, IsEnabled = enabled, DisplayTextOverride = dStr };
                             mParent.Children.Add(dNode);
                             dNode.IsChecked = isSel ? true : false;
                         }
                         else
                         {
-                            FilterItems.Add(new FilterItemModel { Value = val, IsChecked = isSel ? true : false });
+                            FilterItems.Add(new FilterItemModel { Value = val, IsChecked = isSel ? true : false, IsEnabled = enabled });
                         }
                     }
 
@@ -387,8 +413,9 @@ namespace VirtualADGV.WPF
                     // Düz Liste Oluştur
                     foreach (string val in sortedValues)
                     {
-                        bool isSel = allSelected || _previousSelectedValues.Contains(val);
-                        FilterItems.Add(new FilterItemModel { Value = val, IsChecked = isSel ? true : false, DisplayTextOverride = string.IsNullOrEmpty(val) ? Strings.EmptyValue : null });
+                        bool enabled = _enabledValues == null || _enabledValues.Contains(val);
+                        bool isSel = enabled && (allSelected || _previousSelectedValues.Contains(val));
+                        FilterItems.Add(new FilterItemModel { Value = val, IsChecked = isSel ? true : false, IsEnabled = enabled, DisplayTextOverride = string.IsNullOrEmpty(val) ? Strings.EmptyValue : null });
                     }
                 }
 
@@ -442,7 +469,7 @@ namespace VirtualADGV.WPF
 
                 foreach (object item in _filterItemsView)
                 {
-                    if (item is FilterItemModel filterItem)
+                    if (item is FilterItemModel filterItem && filterItem.IsEnabled)
                     {
                         filterItem.IsSelected = isChecked;
                     }
@@ -481,6 +508,7 @@ namespace VirtualADGV.WPF
 
             foreach (var item in visibleItems)
             {
+                if (!item.IsEnabled) continue; // Disabled (0-satır) değerler sayıma katılmaz
                 totalVisible = true;
                 if (item.IsSelected) anyChecked = true;
                 else allChecked = false;
@@ -506,7 +534,22 @@ namespace VirtualADGV.WPF
 
         private void BtnApply_Click(object sender, RoutedEventArgs e)
         {
-            bool allSelected = FilterItems.All(i => i.IsSelected);
+            // Tüm yaprak düğümleri topla (düz liste veya tarih ağacı)
+            var leaves = new List<FilterItemModel>();
+            void CollectLeaves(IEnumerable<FilterItemModel> nodes)
+            {
+                foreach (var n in nodes)
+                {
+                    if (n.Children.Count == 0) leaves.Add(n);
+                    else CollectLeaves(n.Children);
+                }
+            }
+            CollectLeaves(FilterItems);
+
+            // Etkin (disabled olmayan) tüm değerler işaretliyse bu sütun fiilen
+            // filtre uygulamıyor demektir → filtreyi temizle. Disabled değerler zaten
+            // diğer sütunların filtresiyle dışarıda; bu sütuna filtre eklememeliyiz.
+            bool allSelected = leaves.Where(l => l.IsEnabled).All(l => l.IsChecked == true);
 
             if (allSelected)
             {
@@ -514,23 +557,7 @@ namespace VirtualADGV.WPF
             }
             else
             {
-                var selectedValues = new List<string>();
-                FilterItemModel.SuppressNotification = true;
-                
-                // Get all checked leaf nodes
-                void GetCheckedLeaves(IEnumerable<FilterItemModel> nodes)
-                {
-                    foreach (var n in nodes)
-                    {
-                        if (n.Children.Count == 0 && n.IsChecked == true)
-                            selectedValues.Add(n.Value);
-                        else
-                            GetCheckedLeaves(n.Children);
-                    }
-                }
-                
-                GetCheckedLeaves(FilterItems);
-                FilterItemModel.SuppressNotification = false;
+                var selectedValues = leaves.Where(l => l.IsChecked == true).Select(l => l.Value).ToList();
 
                 if (selectedValues.Count == 0)
                 {
