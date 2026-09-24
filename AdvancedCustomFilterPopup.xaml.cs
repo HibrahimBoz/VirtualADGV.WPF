@@ -200,9 +200,9 @@ namespace VirtualADGV.WPF
             _isBuildingList = true;
             try
             {
-                bool isDate = FilterExpressionBuilder.IsDateType(_columnType);
+                bool isDate = FilterListBuilder.UsesDateTree(_columnType);
 
-                // UI Seçimi: Tarihler için TreeView, Diğerleri için ListBox
+                // UI Seçimi: Tarihler (DateTime) için TreeView, Diğerleri (TimeSpan dahil) için ListBox
                 LstItems.Visibility = isDate ? Visibility.Collapsed : Visibility.Visible;
                 TreeViewItems.Visibility = isDate ? Visibility.Visible : Visibility.Collapsed;
 

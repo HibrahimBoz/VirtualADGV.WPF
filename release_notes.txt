@@ -38,11 +38,21 @@ HATA DÜZELTMELERİ:
    * Yükleme sırasında hata olursa popup "Yükleniyor" durumunda takılı kalıyordu.
    * Özel filtrede metin değerlerindeki virgül noktaya çevriliyordu ("Smith, John").
    * short/byte/uint/ulong vb. ve Nullable sayısal tipler artık sayısal sütun sayılıyor.
+   * TimeSpan sütunları tarih ağacına giriyordu ("01:30:00" bugünün tarihi sanılıyordu);
+     artık süreye göre sıralı düz liste olarak gösteriliyor.
+   * Tarih ağacı metin sırasına göre kuruluyordu; ISO dışı biçimlerde (ör. tr-TR
+     "5.01.2024") yıl/ay/gün sırası karışıyordu. Artık tarihe göre sıralanıyor.
+   * Sayısal sıralama: decimal.MaxValue boş değerle çakışıp rastgele yer değiştiriyordu;
+     decimal aralığını aşan double değerler (1E+30, ±∞) en sona düşüyordu. Boş değer
+     artık her zaman en sonda, sayı olmayanlar (NaN) hemen önünde.
 
 TESTLER:
 --------
    * tests/VirtualADGV.WPF.Tests (xUnit, net8.0): WPF'ten bağımsız mantık dosyaları
      linklenerek derlenir; Windows gerektirmeden 'dotnet test' ile çalışır.
+   * Tip kapsamı: 11 sayısal tip + Nullable hâlleri (Min/Max/Epsilon dahil), DateTime,
+     TimeSpan, bool, char, Guid, DateTimeOffset, DateOnly, TimeOnly; Invariant, tr-TR,
+     de-DE ve en-US kültürleriyle (236 test).
 
 ----------------------------------------------------------------------
 

@@ -102,6 +102,10 @@ public class FilterListBuilderTests : IDisposable
     [Theory]
     [InlineData(typeof(string))]
     [InlineData(typeof(int))]
+    [InlineData(typeof(long))]
+    [InlineData(typeof(float))]
+    [InlineData(typeof(double))]
+    [InlineData(typeof(decimal))]
     [InlineData(typeof(DateTime))]
     public void MatchesLegacyAlgorithm(Type type)
     {
@@ -142,7 +146,8 @@ public class FilterListBuilderTests : IDisposable
     private static string RandomValue(Random rng, Type type)
     {
         if (rng.Next(15) == 0) return "";
-        if (type == typeof(int)) return rng.Next(-50, 50).ToString() + (rng.Next(4) == 0 ? ",5" : "");
+        if (FilterExpressionBuilder.IsNumericType(type))
+            return (type == typeof(long) ? rng.NextInt64(-1L << 60, 1L << 60) : rng.Next(-50, 50)).ToString() + (rng.Next(4) == 0 ? ",5" : "");
         if (type == typeof(DateTime))
             return rng.Next(8) == 0 ? "junk" + rng.Next(5) : new DateTime(2020 + rng.Next(3), 1 + rng.Next(12), 1 + rng.Next(28)).ToString("yyyy-MM-dd");
         return ((char)('a' + rng.Next(6))).ToString() + rng.Next(10);

@@ -14,40 +14,74 @@ namespace VirtualADGV.WPF
         /// <param name="distinctValues">Enumerated exactly once (hosts may pass a lazy query).</param>
         /// <param name="previouslySelected">Values checked by this column's active filter; empty = all checked.</param>
         /// <param name="enabledValues">Values still present under other columns' filters; null = all enabled.</param>
-        /// <param name="columnType">Drives numeric sort and the date tree.</param>
+        /// <param name="columnType">Numeric types sort by value, TimeSpan by duration, DateTime builds the date tree.</param>
         /// <param name="emptyText">Display text for the blank value.</param>
         public static List<FilterItemModel> Build(IEnumerable<string> distinctValues, ISet<string> previouslySelected,
             ISet<string>? enabledValues, Type columnType, string emptyText)
         {
             bool allSelected = previouslySelected.Count == 0;
-            bool isNumeric = FilterExpressionBuilder.IsNumericType(columnType);
-            bool isDate = FilterExpressionBuilder.IsDateType(columnType);
 
-            // OrderBy tampona alır: kaynak tek sefer dolaşılır (eski kod iki kez dolaşıyordu)
-            List<string> sortedValues = isNumeric
-                ? distinctValues.Select(v => v ?? string.Empty).OrderBy(NumericSortKey).ToList()
-                : distinctValues.Select(v => v ?? string.Empty).OrderBy(v => v).ToList();
+            // OrderBy tampona alır: kaynak her dalda tek sefer dolaşılır (eski kod iki kez dolaşıyordu)
+            var values = distinctValues.Select(v => v ?? string.Empty);
 
-            var roots = new List<FilterItemModel>(isDate ? 16 : sortedValues.Count);
+            if (UsesDateTree(columnType))
+                return BuildDateTree(values, previouslySelected, allSelected, enabledValues, emptyText);
 
-            if (!isDate)
+            List<string> sortedValues;
+            if (FilterExpressionBuilder.IsNumericType(columnType))
+                sortedValues = values.OrderBy(NumericSortKey).ThenBy(v => v).ToList();
+            else if (FilterExpressionBuilder.IsDateType(columnType)) // TimeSpan: süreye göre düz liste
+                sortedValues = values.OrderBy(DurationSortKey).ThenBy(v => v).ToList();
+            else
+                sortedValues = values.OrderBy(v => v).ToList();
+
+            var roots = new List<FilterItemModel>(sortedValues.Count);
+            foreach (string val in sortedValues)
             {
-                foreach (string val in sortedValues)
-                {
-                    bool enabled = enabledValues == null || enabledValues.Contains(val);
-                    bool isSel = enabled && (allSelected || previouslySelected.Contains(val));
-                    var item = new FilterItemModel { Value = val, IsEnabled = enabled, DisplayTextOverride = val.Length == 0 ? emptyText : null };
-                    item.InitializeCheckState(isSel);
-                    roots.Add(item);
-                }
-                return roots;
+                bool enabled = enabledValues == null || enabledValues.Contains(val);
+                bool isSel = enabled && (allSelected || previouslySelected.Contains(val));
+                var item = new FilterItemModel { Value = val, IsEnabled = enabled, DisplayTextOverride = val.Length == 0 ? emptyText : null };
+                item.InitializeCheckState(isSel);
+                roots.Add(item);
             }
+            return roots;
+        }
+
+        /// <summary>
+        /// True when the column is shown as a Year > Month > Day tree. Only DateTime: a TimeSpan is a
+        /// duration, and DateTime.TryParse would read "01:30:00" as a time on today's date.
+        /// </summary>
+        public static bool UsesDateTree(Type? columnType)
+        {
+            if (columnType == null) return false;
+            return (Nullable.GetUnderlyingType(columnType) ?? columnType) == typeof(DateTime);
+        }
+
+        private static List<FilterItemModel> BuildDateTree(IEnumerable<string> values, ISet<string> previouslySelected,
+            bool allSelected, ISet<string>? enabledValues, string emptyText)
+        {
+            // Her değer bir kez ayrıştırılır ve tarihe göre sıralanır: metin sırası yalnızca ISO
+            // biçiminde kronolojiktir ("5.01.2024" < "10.01.2023" gibi hatalara yol açıyordu).
+            // Boş değer en üstte, ayrıştırılamayanlar tarihlerden sonra (eski metin sırasıyla aynı).
+            var entries = values
+                .Select(v =>
+                {
+                    DateTime parsed = default;
+                    bool isDate = v.Length > 0 && TryParseDate(v, out parsed);
+                    return (Value: v, IsDate: isDate, Date: parsed);
+                })
+                .OrderBy(e => e.Value.Length == 0 ? 0 : e.IsDate ? 1 : 2)
+                .ThenBy(e => e.Date)
+                .ThenBy(e => e.Value)
+                .ToList();
+
+            var roots = new List<FilterItemModel>();
 
             // Hiyerarşik yapı: durumlar sona doğru tek geçişte (gün → ay → yıl) hesaplanır
             var years = new Dictionary<string, FilterItemModel>();
             var months = new Dictionary<(string Year, string Month), FilterItemModel>();
 
-            foreach (string val in sortedValues)
+            foreach (var (val, isDate, dt) in entries)
             {
                 bool enabled = enabledValues == null || enabledValues.Contains(val);
                 bool isSel = enabled && (allSelected || previouslySelected.Contains(val));
@@ -60,7 +94,7 @@ namespace VirtualADGV.WPF
                     continue;
                 }
 
-                if (TryParseDate(val, out DateTime dt))
+                if (isDate)
                 {
                     string yStr = dt.Year.ToString();
                     string mStr = dt.ToString("MMMM"); // October vb. veya 10
@@ -98,10 +132,31 @@ namespace VirtualADGV.WPF
             return roots;
         }
 
-        private static decimal NumericSortKey(string v)
+        /// <summary>
+        /// (sıra, yaklaşık, kesin): double tüm aralığı (1E+30, ±∞) kapsar, decimal eşitlikte long/decimal
+        /// hassasiyetini korur. Sayı olmayanlar (NaN dahil) sayılardan sonra, boş değer her zaman en sonda.
+        /// Eski decimal.MaxValue işareti decimal.MaxValue değeriyle çakışıyordu.
+        /// </summary>
+        private static (int Rank, double Approx, decimal Exact) NumericSortKey(string v)
         {
-            if (string.IsNullOrEmpty(v)) return decimal.MaxValue;
-            return decimal.TryParse(v.Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal d) ? d : decimal.MaxValue;
+            if (v.Length == 0) return (2, 0, 0);
+
+            string s = v.Replace(",", ".");
+            if (!double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out double d) &&
+                !double.TryParse(v, NumberStyles.Float, CultureInfo.CurrentCulture, out d)) // ör. tr-TR "∞"
+                return (1, 0, 0);
+            if (double.IsNaN(d)) return (1, 0, 0);
+
+            decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal exact); // aralık dışı → 0, önemsiz
+            return (0, d, exact);
+        }
+
+        private static (int Rank, TimeSpan Value) DurationSortKey(string v)
+        {
+            if (v.Length == 0) return (2, TimeSpan.Zero);
+            return TimeSpan.TryParse(v, CultureInfo.InvariantCulture, out var ts) || TimeSpan.TryParse(v, CultureInfo.CurrentCulture, out ts)
+                ? (0, ts)
+                : (1, TimeSpan.Zero);
         }
 
         private static bool TryParseDate(string val, out DateTime dt)
