@@ -16,6 +16,8 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/HibrahimBoz/VirtualADGV.WPF</RepositoryUrl>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Test projesi kütüphanenin glob'larına (Compile/Page) dahil olmasın -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

@@ -136,11 +136,12 @@ namespace VirtualADGV.WPF
                 e.Handled = true;
                 bool anyHighlighted = this.Columns.Any(c => GetIsHighlighted(c));
                 bool newState = !anyHighlighted; // toggle: tekrar Ctrl+A → temizle
+                // Hücre stili IsHighlighted'a binding ile bağlı; yalnızca görünür hücreler kendiliğinden
+                // güncellenir. Items.Refresh() 1M satırda tüm görünümü yeniden kurup UI'ı donduruyordu.
                 foreach (var col in this.Columns)
                     SetIsHighlighted(col, newState);
                 this.UnselectAllCells();
                 this.SelectedItem = null;
-                this.Items.Refresh();
             }));
 
             this.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(OnHeaderButtonClick));
@@ -275,8 +276,8 @@ namespace VirtualADGV.WPF
             Color bgColor = isDarkMode ? Color.FromRgb(24, 24, 27) : Colors.White;
             Color fgColor = isDarkMode ? Color.FromRgb(248, 250, 252) : Color.FromRgb(15, 23, 42);
 
-            this.Resources["PopupBackgroundBrush"] = new SolidColorBrush(bgColor);
-            this.Resources["PopupForegroundBrush"] = new SolidColorBrush(fgColor);
+            this.Resources["PopupBackgroundBrush"] = ThemeBrush.Create(bgColor);
+            this.Resources["PopupForegroundBrush"] = ThemeBrush.Create(fgColor);
         }
 
         private void OnGridDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -314,9 +315,7 @@ namespace VirtualADGV.WPF
 
             foreach (var col in this.Columns) SetIsHighlighted(col, false);
 
-            SetIsHighlighted(column, !current);
-
-            this.Items.Refresh();
+            SetIsHighlighted(column, !current); // Binding ile yansır; Items.Refresh() gerekmez
         }
 
         private void OnHeaderButtonClick(object sender, RoutedEventArgs e)
@@ -330,32 +329,54 @@ namespace VirtualADGV.WPF
             }
         }
 
+        private int _filterRequestVersion;
+
         /// <summary>Handles the filter button click asynchronosuly.</summary>
         protected virtual async void OnFilterButtonClick(Button button, DataGridColumnHeader header)
         {
             if (FilterPopup == null) return;
 
             var column = header.Column;
+            if (column == null) return; // Dolgu (filler) başlığının sütunu yoktur
             string colName = column.Header?.ToString() ?? "";
             if (string.IsNullOrEmpty(colName)) return;
 
             if (FilterPopup.Child is AdvancedCustomFilterPopup filterUI)
             {
                 Type? dataType = null;
-                if (this.ItemsSource is System.Data.DataView view && view.Table.Columns.Contains(colName))
+                if (this.ItemsSource is System.Data.DataView view && view.Table is { } table && table.Columns.Contains(colName))
                 {
-                    dataType = view.Table.Columns[colName].DataType;
+                    dataType = table.Columns[colName]!.DataType;
                 }
 
                 var args = new LoadingFilterEventArgs { ColumnName = colName, ColumnType = dataType ?? typeof(string) };
+
+                // Yükleme sürerken başka bir sütunun filtresi açılırsa eski (geç gelen) yanıt yok sayılır;
+                // aksi halde B sütununda açık popup A'nın değerleriyle dolup filtre A'ya uygulanıyordu.
+                int requestVersion = ++_filterRequestVersion;
 
                 filterUI.SetTheme(_isDarkMode);
                 filterUI.IsLoading = true;
                 FilterPopup.PlacementTarget = button;
                 FilterPopup.IsOpen = true;
 
-                if (LoadingFilterValuesAsync != null) await LoadingFilterValuesAsync(this, args);
-                else LoadingFilterValues?.Invoke(this, args);
+                try
+                {
+                    if (LoadingFilterValuesAsync != null) await LoadingFilterValuesAsync(this, args);
+                    else LoadingFilterValues?.Invoke(this, args);
+                }
+                catch
+                {
+                    // Popup yükleniyor durumunda takılı kalmasın; hata uygulamaya iletilir
+                    if (requestVersion == _filterRequestVersion)
+                    {
+                        filterUI.IsLoading = false;
+                        FilterPopup.IsOpen = false;
+                    }
+                    throw;
+                }
+
+                if (requestVersion != _filterRequestVersion) return;
 
                 filterUI.Initialize(colName, args.DistinctValues ?? new List<string>(), args.ActiveFilters ?? new List<string>(), args.ColumnType ?? typeof(string), Strings, args.EnabledValues);
                 filterUI.IsLoading = false;

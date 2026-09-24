@@ -40,7 +40,13 @@ An advanced, high-performance WPF DataGrid control with Excel-like filtering, mu
 ### Performance
 - Built on WPF's built-in row/column virtualization (`EnableRowVirtualization`, `EnableColumnVirtualization`)
 - `LoadingFilterValuesAsync` — async data loading prevents UI freeze on large datasets
-- `SelectAll` (Ctrl+A) intentionally disabled to prevent freezing on 1M+ row grids
+- `SelectAll` (Ctrl+A) intentionally disabled to prevent freezing on 1M+ row grids — column highlight updates only the visible cells (no full `Items.Refresh()`)
+- Filter popup builds its value list in O(n) with a single collection reset (100k values / 50k active filters: ~22 s → ~0.2 s)
+
+### Security of `FilterString`
+- Column names are emitted as `"identifier"` with embedded `"` doubled; text values as `'literal'` with embedded `'` doubled
+- Numeric values are written bare **only** if they are plain numeric literals (`,` is accepted as the decimal separator); anything else is emitted as a quoted literal, so values typed in the custom filter dialog (e.g. `1 OR 1=1`) or coming from data cannot inject SQL
+- `%` and `_` inside LIKE patterns are passed through as wildcards
 
 ### Localization
 - All UI strings are configurable via `grid.Strings.*`
@@ -256,7 +262,13 @@ Büyük veri setleri (1M+ satır) için tasarlanmış, Excel benzeri filtreleme,
 ### Performans
 - WPF'in yerleşik satır/sütun sanallaştırması üzerine kurulu
 - `LoadingFilterValuesAsync` — async veri yükleme, büyük veri setlerinde UI'ı dondurmaz
-- 1M+ satırlı grids'te donmayı engellemek için `SelectAll` (Ctrl+A) kasıtlı devre dışı
+- 1M+ satırlı grids'te donmayı engellemek için `SelectAll` (Ctrl+A) kasıtlı devre dışı — sütun vurgusu yalnızca görünür hücreleri günceller (tam `Items.Refresh()` yok)
+- Filtre popup'ı değer listesini O(n) ve tek koleksiyon reset'i ile kurar (100 bin değer / 50 bin aktif filtre: ~22 sn → ~0,2 sn)
+
+### `FilterString` Güvenliği
+- Sütun adları `"tanımlayıcı"` olarak, içteki `"` ikilenerek; metin değerleri `'literal'` olarak, içteki `'` ikilenerek yazılır
+- Sayısal değerler **yalnızca** düz sayı biçimindeyse tırnaksız yazılır (`,` ondalık ayırıcı kabul edilir); aksi halde tırnaklı literal olur — özel filtre diyaloğuna yazılan (örn. `1 OR 1=1`) ya da veriden gelen değerler SQL enjekte edemez
+- LIKE kalıplarındaki `%` ve `_` joker karakter olarak aynen geçer
 
 ### Lokalizasyon
 - Tüm UI metinleri `grid.Strings.*` üzerinden özelleştirilebilir

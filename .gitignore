@@ -4,6 +4,8 @@ obj/
 *.user
 *.userosscache
 *.sln.docstates
+# WPF markup-compile temp project (contains local absolute paths)
+*_wpftmp.csproj
 
 # Visual Studio
 .vs/

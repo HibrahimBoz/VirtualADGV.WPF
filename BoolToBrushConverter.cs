@@ -21,6 +21,9 @@ namespace VirtualADGV.WPF
         /// </summary>
         public Brush? UnmatchedBrush { get; set; }
 
+        // Convert her öğe için çağrılır; varsayılan fırça bir kez oluşturulup paylaşılır
+        private static readonly Brush DefaultUnmatchedBrush = ThemeBrush.Create(Color.FromRgb(148, 163, 184)); // Slate-400
+
         /// <summary>
         /// Converts boolean to Brush.
         /// </summary>
@@ -31,7 +34,7 @@ namespace VirtualADGV.WPF
                 return MatchedBrush ?? (SystemParameters.HighContrast ? SystemColors.WindowTextBrush : Brushes.Black);
             }
             
-            return UnmatchedBrush ?? new SolidColorBrush(Color.FromRgb(148, 163, 184)); // Slate-400
+            return UnmatchedBrush ?? DefaultUnmatchedBrush;
         }
 
         /// <summary>

@@ -14,141 +14,6 @@ using System.Threading.Tasks;
 namespace VirtualADGV.WPF
 {
     /// <summary>
-    /// Represents an item in the filter list (checkbox list or tree view).
-    /// Supports hierarchical selection (Select All, Year > Month > Day).
-    /// </summary>
-    public class FilterItemModel : INotifyPropertyChanged
-    {
-        private bool? _isChecked = true;
-        /// <summary>Gets or sets the checked state. Supports indeterminate state.</summary>
-        public bool? IsChecked
-        {
-            get => _isChecked;
-            set
-            {
-                if (_isChecked != value)
-                {
-                    _isChecked = value;
-                    if (!SuppressNotification) 
-                    {
-                        OnPropertyChanged(nameof(IsChecked));
-                        UpdateChildrenCheckState(value);
-                        UpdateParentCheckState();
-                    }
-                }
-            }
-        }
-
-        /// <summary>Backward compatibility for flat list selection.</summary>
-        public bool IsSelected
-        {
-            get => _isChecked == true;
-            set => IsChecked = value;
-        }
-
-        /// <summary>Utility to prevent recursive property changed events during bulk updates.</summary>
-        public static bool SuppressNotification { get; set; } = false;
-
-        /// <summary>The actual data value (string representation) used for filtering.</summary>
-        public string Value { get; set; } = string.Empty;
-        
-        /// <summary>Optional display text if different from Value (e.g., "(Blank)").</summary>
-        public string? DisplayTextOverride { get; set; }
-        
-        /// <summary>The text shown in the UI.</summary>
-        public string DisplayText => DisplayTextOverride ?? (string.IsNullOrEmpty(Value) ? "(Blank)" : Value);
-
-        private bool _isMatched = true;
-        /// <summary>Whether this item matches the search text in the filter popup.</summary>
-        public bool IsMatched
-        {
-            get => _isMatched;
-            set
-            {
-                if (_isMatched != value)
-                {
-                    _isMatched = value;
-                    if (!SuppressNotification) OnPropertyChanged(nameof(IsMatched));
-                }
-            }
-        }
-
-        private bool _isEnabled = true;
-        /// <summary>
-        /// Whether this value still exists under the other columns' active filters.
-        /// Disabled (0-row) values are shown grayed and cannot be checked.
-        /// </summary>
-        public bool IsEnabled
-        {
-            get => _isEnabled;
-            set
-            {
-                if (_isEnabled != value)
-                {
-                    _isEnabled = value;
-                    if (!SuppressNotification) OnPropertyChanged(nameof(IsEnabled));
-                }
-            }
-        }
-
-        private bool _isExpanded = false;
-        /// <summary>Whether the tree node is expanded.</summary>
-        public bool IsExpanded
-        {
-            get => _isExpanded;
-            set
-            {
-                if (_isExpanded != value)
-                {
-                    _isExpanded = value;
-                    if (!SuppressNotification) OnPropertyChanged(nameof(IsExpanded));
-                }
-            }
-        }
-
-        /// <summary>Parent node in hierarchical view.</summary>
-        public FilterItemModel? Parent { get; set; }
-        
-        /// <summary>Child nodes in hierarchical view.</summary>
-        public ObservableCollection<FilterItemModel> Children { get; } = new ObservableCollection<FilterItemModel>();
-
-        private void UpdateChildrenCheckState(bool? state)
-        {
-            if (state == null || Children.Count == 0) return;
-            SuppressNotification = true;
-            foreach (var child in Children)
-            {
-                child.IsChecked = state;
-                child.UpdateChildrenCheckState(state);
-            }
-            SuppressNotification = false;
-        }
-
-        /// <summary>Updates the parent check state based on children (None/Partial/All checked).</summary>
-        public void UpdateParentCheckState()
-        {
-            if (Parent == null) return;
-            SuppressNotification = true;
-            bool hasChecked = Parent.Children.Any(c => c.IsChecked == true);
-            bool hasUnchecked = Parent.Children.Any(c => c.IsChecked == false);
-            bool hasIndeterminate = Parent.Children.Any(c => c.IsChecked == null);
-
-            if (hasChecked && !hasUnchecked && !hasIndeterminate) Parent.IsChecked = true;
-            else if (!hasChecked && hasUnchecked && !hasIndeterminate) Parent.IsChecked = false;
-            else Parent.IsChecked = null;
-
-            SuppressNotification = false;
-            Parent.OnPropertyChanged(nameof(IsChecked));
-            Parent.UpdateParentCheckState();
-        }
-
-        /// <summary>Occurs when a property value changes.</summary>
-        public event PropertyChangedEventHandler? PropertyChanged;
-        /// <summary>Raises the PropertyChanged event.</summary>
-        protected void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-    }
-
-    /// <summary>
     /// Interaction logic for AdvancedCustomFilterPopup.xaml
     /// </summary>
     public partial class AdvancedCustomFilterPopup : System.Windows.Controls.UserControl
@@ -165,7 +30,8 @@ namespace VirtualADGV.WPF
         }
 
         /// <summary>List of items available for selection in the filter list.</summary>
-        public ObservableCollection<FilterItemModel> FilterItems { get; private set; } = new ObservableCollection<FilterItemModel>();
+        public ObservableCollection<FilterItemModel> FilterItems => _filterItems;
+        private readonly BulkObservableCollection<FilterItemModel> _filterItems = new();
         private ICollectionView _filterItemsView;
 
         /// <summary>Localization strings for current language.</summary>
@@ -181,8 +47,9 @@ namespace VirtualADGV.WPF
         public Action? OnPopupClosed { get; set; }
 
         private bool _isBuildingList = false;
-        private List<string> _previousSelectedValues = new List<string>();
+        private HashSet<string> _previousSelectedValues = new HashSet<string>();
         private System.Windows.Threading.DispatcherTimer _searchTimer;
+        private string _searchText = string.Empty; // SearchFilter her öğede TextBox'a gitmesin diye önbellek
 
         /// <summary>Initializes a new instance of the popup.</summary>
         public AdvancedCustomFilterPopup()
@@ -198,6 +65,7 @@ namespace VirtualADGV.WPF
             _searchTimer.Tick += (s, e) =>
             {
                 _searchTimer.Stop();
+                _searchText = string.IsNullOrWhiteSpace(TxtSearch.Text) ? string.Empty : TxtSearch.Text;
                 _filterItemsView.Refresh();
                 UpdateSelectAllCheckBox();
             };
@@ -222,15 +90,16 @@ namespace VirtualADGV.WPF
             ColumnName = columnName;
             _columnType = columnType;
             _enabledValues = enabledValues;
-            _previousSelectedValues = activeFilters?.ToList() ?? new List<string>();
+            // HashSet: değer başına Contains O(1) — List ile O(n·m) idi, büyük listelerde UI donuyordu
+            _previousSelectedValues = new HashSet<string>(activeFilters ?? Enumerable.Empty<string>());
 
-            BtnClearFilter.IsEnabled = _previousSelectedValues.Any();
+            BtnClearFilter.IsEnabled = _previousSelectedValues.Count > 0;
             TxtSearch.Text = "";
+            _searchText = string.Empty;
+            _searchTimer.Stop(); // Temizleme TextChanged tetiklediyse gereksiz ikinci Refresh'i engelle
 
-            bool isNumeric = columnType == typeof(int) || columnType == typeof(long) ||
-                            columnType == typeof(double) || columnType == typeof(float) ||
-                            columnType == typeof(decimal);
-            bool isDate = columnType == typeof(DateTime) || columnType == typeof(TimeSpan);
+            bool isNumeric = FilterExpressionBuilder.IsNumericType(columnType);
+            bool isDate = FilterExpressionBuilder.IsDateType(columnType);
 
             txtMode.Text = (isNumeric || isDate) ? (isNumeric ? Strings.NumberFilters : Strings.DateFilters) : Strings.TextFilters;
 
@@ -331,98 +200,22 @@ namespace VirtualADGV.WPF
             _isBuildingList = true;
             try
             {
-                FilterItems.Clear();
-                bool allSelected = !_previousSelectedValues.Any();
-
-                var sortedValues = distinctValues.ToList();
-                bool isNumeric = _columnType == typeof(int) || _columnType == typeof(long) ||
-                                _columnType == typeof(double) || _columnType == typeof(float) ||
-                                _columnType == typeof(decimal);
-                bool isDate = _columnType == typeof(DateTime) || _columnType == typeof(TimeSpan);
+                bool isDate = FilterExpressionBuilder.IsDateType(_columnType);
 
                 // UI Seçimi: Tarihler için TreeView, Diğerleri için ListBox
                 LstItems.Visibility = isDate ? Visibility.Collapsed : Visibility.Visible;
                 TreeViewItems.Visibility = isDate ? Visibility.Visible : Visibility.Collapsed;
 
-                if (isNumeric)
-                {
-                    sortedValues = distinctValues.OrderBy(v =>
-                    {
-                        if (string.IsNullOrEmpty(v)) return decimal.MaxValue;
-                        return decimal.TryParse(v.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal d) ? d : decimal.MaxValue;
-                    }).ToList();
-                }
-                else
-                {
-                    sortedValues = distinctValues.OrderBy(v => v).ToList();
-                }
+                var items = FilterListBuilder.Build(distinctValues, _previousSelectedValues, _enabledValues, _columnType, Strings.EmptyValue);
 
-                if (isDate)
-                {
-                    // Hiyerarşik Yapı Oluştur
-                    var years = new Dictionary<string, FilterItemModel>();
-
-                    foreach (string val in sortedValues)
-                    {
-                        bool enabled = _enabledValues == null || _enabledValues.Contains(val);
-                        bool isSel = enabled && (allSelected || _previousSelectedValues.Contains(val));
-
-                        if (string.IsNullOrEmpty(val))
-                        {
-                            FilterItems.Add(new FilterItemModel { Value = "", IsSelected = isSel, IsEnabled = enabled, DisplayTextOverride = Strings.EmptyValue });
-                            continue;
-                        }
-
-                        DateTime dt;
-                        if (DateTime.TryParse(val, out dt) || (val.Length >= 10 && DateTime.TryParseExact(val.Substring(0,10), "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out dt)))
-                        {
-                            string yStr = dt.Year.ToString();
-                            string mStr = dt.ToString("MMMM"); // October vb. veya 10
-                            string dStr = dt.Day.ToString("00");
-
-                            if (!years.ContainsKey(yStr))
-                            {
-                                var yNode = new FilterItemModel { Value = yStr, IsExpanded = false };
-                                FilterItems.Add(yNode);
-                                years[yStr] = yNode;
-                            }
-
-                            var yParent = years[yStr];
-                            var mParent = yParent.Children.FirstOrDefault(c => c.Value == mStr);
-                            if (mParent == null)
-                            {
-                                mParent = new FilterItemModel { Value = mStr, Parent = yParent, IsExpanded = false };
-                                yParent.Children.Add(mParent);
-                            }
-
-                            var dNode = new FilterItemModel { Value = val, Parent = mParent, IsExpanded = false, IsEnabled = enabled, DisplayTextOverride = dStr };
-                            mParent.Children.Add(dNode);
-                            dNode.IsChecked = isSel ? true : false;
-                        }
-                        else
-                        {
-                            FilterItems.Add(new FilterItemModel { Value = val, IsChecked = isSel ? true : false, IsEnabled = enabled });
-                        }
-                    }
-
-                    // Re-calculate states based on leaf nodes
-                    foreach (var root in FilterItems) root.UpdateParentCheckState();
-                }
-                else
-                {
-                    // Düz Liste Oluştur
-                    foreach (string val in sortedValues)
-                    {
-                        bool enabled = _enabledValues == null || _enabledValues.Contains(val);
-                        bool isSel = enabled && (allSelected || _previousSelectedValues.Contains(val));
-                        FilterItems.Add(new FilterItemModel { Value = val, IsChecked = isSel ? true : false, IsEnabled = enabled, DisplayTextOverride = string.IsNullOrEmpty(val) ? Strings.EmptyValue : null });
-                    }
-                }
+                // Tek Reset bildirimi: öğe başına CollectionChanged + görünüm güncellemesi yerine bir kez
+                _filterItems.ReplaceAll(items);
 
                 UpdateSelectAllCheckBox();
             }
             catch (Exception ex)
             {
+                _filterItems.ReplaceAll(Array.Empty<FilterItemModel>()); // Önceki sütunun değerleri kalmasın
                 System.Windows.MessageBox.Show($"{Strings.LoadingError}: {ex.Message}");
             }
             finally
@@ -435,13 +228,8 @@ namespace VirtualADGV.WPF
         {
             if (item is FilterItemModel filterItem)
             {
-                if (string.IsNullOrWhiteSpace(TxtSearch.Text))
-                {
-                    filterItem.IsMatched = true;
-                    return true;
-                }
-
-                bool match = filterItem.DisplayText.Contains(TxtSearch.Text, StringComparison.OrdinalIgnoreCase);
+                bool match = _searchText.Length == 0 ||
+                             filterItem.DisplayText.Contains(_searchText, StringComparison.OrdinalIgnoreCase);
                 filterItem.IsMatched = match;
                 return match;
             }
@@ -463,10 +251,9 @@ namespace VirtualADGV.WPF
 
             try
             {
-                // Görünür elemanları hızlıca belirlemek için ICollectionView üzerinde dön
-                // .Cast<T>().ToList() yerine direkt döngü + kontrol kullanabiliriz
-                FilterItemModel.SuppressNotification = true;
-
+                // Bildirimler açık kalır: yalnızca realize edilmiş (görünür) satırlar dinlediği için
+                // ucuzdur ve tarih ağacında alt düğümlere de yayılır. Tüm listeyi yeniden üreten
+                // Refresh() çağrısına gerek kalmaz.
                 foreach (object item in _filterItemsView)
                 {
                     if (item is FilterItemModel filterItem && filterItem.IsEnabled)
@@ -474,9 +261,6 @@ namespace VirtualADGV.WPF
                         filterItem.IsSelected = isChecked;
                     }
                 }
-
-                FilterItemModel.SuppressNotification = false;
-                _filterItemsView.Refresh();
             }
             finally
             {
@@ -559,42 +343,10 @@ namespace VirtualADGV.WPF
             {
                 var selectedValues = leaves.Where(l => l.IsChecked == true).Select(l => l.Value).ToList();
 
-                if (selectedValues.Count == 0)
-                {
-                    OnFilterApplied?.Invoke(ColumnName, "1=0");
-                }
-                else
-                {
-                    bool isNumeric = _columnType == typeof(int) || _columnType == typeof(long) ||
-                                   _columnType == typeof(double) || _columnType == typeof(float) ||
-                                   _columnType == typeof(decimal);
-
-                    IEnumerable<string> formatted;
-                    if (isNumeric)
-                    {
-                        // Sayısal kolonlar için tırnaksız ve nokta (.) kullan
-                        formatted = selectedValues.Select(v =>
-                        {
-                            if (string.IsNullOrEmpty(v)) return "NULL";
-                            string clean = v.Replace(",", ".");
-                            // Sadece sayısal kısımları alalım (bazen birim vs olabilir ama distinct listesinde temiz olmalı)
-                            return clean;
-                        });
-                    }
-                    else
-                    {
-                        formatted = selectedValues.Select(v => $"'{v.Replace("'", "''")}'");
-                    }
-
-                    string condition = $"\"{ColumnName}\" IN ({string.Join(",", formatted)})";
-
-                    if (selectedValues.Contains(""))
-                    {
-                        condition = $"({condition} OR \"{ColumnName}\" IS NULL)";
-                    }
-
-                    OnFilterApplied?.Invoke(ColumnName, condition);
-                }
+                // Sütun adı ve değerler kaçışlanır; sayısal değerler yalnızca geçerli sayıysa çıplak
+                // yazılır — veri/başlık içeriği SQL ifadesinin dışına taşamaz ("1=0" boş seçim içindir)
+                bool isNumeric = FilterExpressionBuilder.IsNumericType(_columnType);
+                OnFilterApplied?.Invoke(ColumnName, FilterExpressionBuilder.BuildInCondition(ColumnName, selectedValues, isNumeric));
             }
             OnPopupClosed?.Invoke();
         }
@@ -638,23 +390,23 @@ namespace VirtualADGV.WPF
             Color unmatchedColor = isDarkMode ? Color.FromRgb(148, 163, 184) : Color.FromRgb(148, 163, 184);
 
             // Update DynamicResources
-            this.Resources["PopupBackgroundBrush"] = new SolidColorBrush(bgColor);
-            this.Resources["PopupForegroundBrush"] = new SolidColorBrush(fgColor);
-            this.Resources["PopupBorderBrush"] = new SolidColorBrush(borderColor);
-            this.Resources["ControlBackgroundBrush"] = new SolidColorBrush(controlColor);
-            this.Resources["ListBackgroundBrush"] = new SolidColorBrush(listColor);
-            this.Resources["DividerBrush"] = new SolidColorBrush(dividerColor);
-            this.Resources["SubtleForegroundBrush"] = new SolidColorBrush(subtleColor);
-            this.Resources["SearchIconBrush"] = new SolidColorBrush(iconColor);
-            this.Resources["HoverBrush"] = new SolidColorBrush(hoverColor);
-            this.Resources["UnmatchedBrush"] = new SolidColorBrush(unmatchedColor);
+            this.Resources["PopupBackgroundBrush"] = ThemeBrush.Create(bgColor);
+            this.Resources["PopupForegroundBrush"] = ThemeBrush.Create(fgColor);
+            this.Resources["PopupBorderBrush"] = ThemeBrush.Create(borderColor);
+            this.Resources["ControlBackgroundBrush"] = ThemeBrush.Create(controlColor);
+            this.Resources["ListBackgroundBrush"] = ThemeBrush.Create(listColor);
+            this.Resources["DividerBrush"] = ThemeBrush.Create(dividerColor);
+            this.Resources["SubtleForegroundBrush"] = ThemeBrush.Create(subtleColor);
+            this.Resources["SearchIconBrush"] = ThemeBrush.Create(iconColor);
+            this.Resources["HoverBrush"] = ThemeBrush.Create(hoverColor);
+            this.Resources["UnmatchedBrush"] = ThemeBrush.Create(unmatchedColor);
 
             // ContextMenu'yu da güncelle (Eğer açıksa)
             if (SubMenuFilters != null)
             {
-                SubMenuFilters.Background = new SolidColorBrush(bgColor);
-                SubMenuFilters.Foreground = new SolidColorBrush(fgColor);
-                SubMenuFilters.BorderBrush = new SolidColorBrush(borderColor);
+                SubMenuFilters.Background = ThemeBrush.Create(bgColor);
+                SubMenuFilters.Foreground = ThemeBrush.Create(fgColor);
+                SubMenuFilters.BorderBrush = ThemeBrush.Create(borderColor);
             }
         }
     }

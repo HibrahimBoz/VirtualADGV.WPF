@@ -1,6 +1,51 @@
 VirtualADGV.WPF - Sürüm Notları (Release Notes)
 ===========================================
 
+Sürüm: Yayımlanmamış (Güvenlik ve Performans Düzeltmeleri)
+
+GÜVENLİK:
+---------
+   * SQL enjeksiyonu: filtre ifadelerindeki sütun adı artık kaçışlanıyor ("" ile).
+     Veriden gelen (ör. CSV başlığı) bir sütun adı ifadenin dışına taşamaz.
+   * SQL enjeksiyonu: sayısal sütunlarda değerler yalnızca geçerli bir sayıysa tırnaksız
+     yazılıyor; özel filtre diyaloğuna yazılan "1 OR 1=1" gibi girdiler ve sayı olmayan
+     distinct değerler tırnaklı literal olarak kaçışlanıyor.
+   * Tüm ifade üretimi FilterExpressionBuilder'da toplandı ve testlerle (rastgele kötü
+     niyetli girdi dahil) doğrulanıyor.
+   * Yerel dosya yolları içeren derleme artığı VirtualADGV.WPF_*_wpftmp.csproj repodan
+     kaldırıldı ve .gitignore'a eklendi (kökte 'dotnet build' de artık çalışıyor).
+
+PERFORMANS:
+-----------
+   * Ctrl+A ve sütun başlığına çift tıklama artık Items.Refresh() çağırmıyor; vurgu
+     binding ile yalnızca görünür hücrelere yansıyor (1M satırda UI donması giderildi).
+   * Filtre popup'ı: aktif filtre araması List yerine HashSet (O(n·m) → O(n));
+     100 bin değer / 50 bin aktif filtre ile liste kurulumu ~22 sn → ~0,2 sn.
+   * Filtre listesi öğe öğe Add yerine tek Reset bildirimiyle dolduruluyor; distinct
+     değerler tek sefer dolaşılıyor (tembel sorgular iki kez çalışmıyor).
+   * Tümünü Seç tüm listeyi yeniden üreten Refresh() yerine bildirimle çalışıyor; arama
+     metni her öğe için TextBox'tan okunmuyor; tema fırçaları donduruluyor (Freeze).
+
+HATA DÜZELTMELERİ:
+------------------
+   * Tarih ağacında yıl/ay işaretlendiğinde alt düğümlerin checkbox'ları güncellenmiyordu
+     (static SuppressNotification iç içe sıfırlanıyordu).
+   * Tarih ağacında Tümünü Seç yaprak (gün) düğümlerine uygulanmıyordu.
+   * Tarih ağacında sonradan eklenen, tamamen seçili bir ay yıl düğümünü güncellemiyordu
+     (yıl yanlışlıkla "işaretsiz" görünebiliyordu).
+   * Filtre değerleri yüklenirken başka bir sütunun filtresi açılırsa geç gelen yanıt yeni
+     popup'ı dolduruyor ve filtre yanlış sütuna uygulanıyordu.
+   * Yükleme sırasında hata olursa popup "Yükleniyor" durumunda takılı kalıyordu.
+   * Özel filtrede metin değerlerindeki virgül noktaya çevriliyordu ("Smith, John").
+   * short/byte/uint/ulong vb. ve Nullable sayısal tipler artık sayısal sütun sayılıyor.
+
+TESTLER:
+--------
+   * tests/VirtualADGV.WPF.Tests (xUnit, net8.0): WPF'ten bağımsız mantık dosyaları
+     linklenerek derlenir; Windows gerektirmeden 'dotnet test' ile çalışır.
+
+----------------------------------------------------------------------
+
 Sürüm: 1.0.3 (Kademeli Filtre — Disabled Değerler)
 Tarih: 3 Haziran 2026
 

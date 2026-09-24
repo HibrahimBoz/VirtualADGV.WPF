@@ -112,7 +112,7 @@ namespace VirtualADGV.WPF
             string op2 = _opMap.GetValueOrDefault(opLabel2, "eşittir");
             string val2 = TxtValue2.Text.Trim();
 
-            string logic = RbAnd.IsChecked == true ? "AND" : "OR";
+            bool useAnd = RbAnd.IsChecked == true;
 
             if (string.IsNullOrEmpty(val1) && string.IsNullOrEmpty(val2))
             {
@@ -121,59 +121,13 @@ namespace VirtualADGV.WPF
                 return;
             }
 
-            string f1 = BuildFilterPart(op1, val1);
-            string f2 = BuildFilterPart(op2, val2);
+            // Sütun adı ve değerler FilterExpressionBuilder'da kaçışlanır; sayısal sütunda
+            // geçersiz giriş (örn. "1 OR 1=1") çıplak değil tırnaklı literal olarak yazılır
+            string f1 = FilterExpressionBuilder.BuildComparison(_columnName, op1, val1, _dataType);
+            string f2 = FilterExpressionBuilder.BuildComparison(_columnName, op2, val2, _dataType);
 
-            if (!string.IsNullOrEmpty(f1) && !string.IsNullOrEmpty(f2))
-            {
-                FilterCondition = $"({f1} {logic} {f2})";
-            }
-            else if (!string.IsNullOrEmpty(f1))
-            {
-                FilterCondition = f1;
-            }
-            else
-            {
-                FilterCondition = f2;
-            }
-
+            FilterCondition = FilterExpressionBuilder.CombineConditions(f1, f2, useAnd);
             DialogResult = true;
-        }
-
-        private string BuildFilterPart(string op, string val)
-        {
-            if (string.IsNullOrEmpty(val)) return string.Empty;
-
-            // Sayısal değerler için virgülü noktaya çevir
-            string cleanVal = val.Trim().Replace(",", ".");
-            string safeVal = cleanVal.Replace("'", "''");
-            string col = $"\"{_columnName}\"";
-
-            bool isNumeric = _dataType == typeof(int) || _dataType == typeof(long) || 
-                           _dataType == typeof(double) || _dataType == typeof(float) || 
-                           _dataType == typeof(decimal);
-
-            // Sayısal ise tırnaksız, değilse tırnaklı (LIKE hariç)
-            string v = isNumeric ? safeVal : $"'{safeVal}'";
-
-            return op switch
-            {
-                "eşittir" => $"{col} = {v}",
-                "eşit değildir" => $"{col} <> {v}",
-                "başlar" => $"{col} LIKE '{safeVal}%'",
-                "biter" => $"{col} LIKE '%{safeVal}'",
-                "içerir" => $"{col} LIKE '%{safeVal}%'",
-                "içermez" => $"{col} NOT LIKE '%{safeVal}%'",
-                "büyük" => $"{col} > {v}",
-                "büyük veya eşittir" => $"{col} >= {v}",
-                "küçük" => $"{col} < {v}",
-                "küçük veya eşittir" => $"{col} <= {v}",
-                "önce" => $"{col} < {v}", // Tarihler tırnak gerektirir (v zaten tırnaklı olacak)
-                "sonra" => $"{col} > {v}",
-                "önce veya eşit" => $"{col} <= {v}",
-                "sonra veya eşit" => $"{col} >= {v}",
-                _ => $"{col} = {v}"
-            };
         }
 
         /// <summary>
@@ -191,14 +145,14 @@ namespace VirtualADGV.WPF
             var borderColor = isDarkMode ? Color.FromRgb(39, 39, 42) : Color.FromRgb(226, 232, 240);
             var textMuted = isDarkMode ? Color.FromRgb(161, 161, 170) : Color.FromRgb(100, 116, 139);
 
-            this.Resources["WinBg"] = new SolidColorBrush(winBg);
-            this.Resources["WinFg"] = new SolidColorBrush(winFg);
-            this.Resources["TitleBg"] = new SolidColorBrush(titleBg);
-            this.Resources["TitleFg"] = new SolidColorBrush(titleFg);
-            this.Resources["ControlBg"] = new SolidColorBrush(controlBg);
-            this.Resources["ControlFg"] = new SolidColorBrush(controlFg);
-            this.Resources["BorderBrush"] = new SolidColorBrush(borderColor);
-            this.Resources["TextMuted"] = new SolidColorBrush(textMuted);
+            this.Resources["WinBg"] = ThemeBrush.Create(winBg);
+            this.Resources["WinFg"] = ThemeBrush.Create(winFg);
+            this.Resources["TitleBg"] = ThemeBrush.Create(titleBg);
+            this.Resources["TitleFg"] = ThemeBrush.Create(titleFg);
+            this.Resources["ControlBg"] = ThemeBrush.Create(controlBg);
+            this.Resources["ControlFg"] = ThemeBrush.Create(controlFg);
+            this.Resources["BorderBrush"] = ThemeBrush.Create(borderColor);
+            this.Resources["TextMuted"] = ThemeBrush.Create(textMuted);
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
